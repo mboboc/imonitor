@@ -1,6 +1,6 @@
 # imonitor
 
-##### Some people, when confronted with a problem think "I know, I'll use a configuration file" Now they have their clients problems
+> Some people, when confronted with a problem think "I know, I'll use a configuration file". Now they have their clients problems.
 
 
 Program that monitors remote connections done by a user.
