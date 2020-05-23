@@ -96,14 +96,10 @@ static void create_logfile() {
 	logfd = open(AUTH_LOG_PATH, O_RDWR | O_CREAT, 0644);
     DIE(logfd < 0, "open failed");
 
-	fd = open(PATH_WTMP, O_RDONLY, 0644);
-	DIE(fd < 0, "open failed");
-
 	utmpxname(PATH_WTMP);
 	setutxent();
-
 	
-	sprintf(format_buf, "user 	type 	PID line 	id 		host 	date/time\n");
+	sprintf(format_buf, "user 	type 	PID     line 	id 		host 	date/time\n");
 	rc = write(logfd, format_buf, strlen(format_buf));
 	DIE(rc < 0, "write failed");
 	memset(&ut, 0, sizeof(ut));
@@ -180,7 +176,7 @@ int main(int argc, char *argv[]) {
     DIE(inotifyfd < 0, "inotify_init failed");
 
     /* Start monitoring WTMP */
-    wtmpfd = inotify_add_watch(inotifyfd, "/home/madix", IN_MODIFY);
+    wtmpfd = inotify_add_watch(inotifyfd, PATH_WTMP, IN_MODIFY);
     DIE(wtmpfd < 0, "inotify_add_watch failed");
 
     /* Add inotify fd to epoll */
