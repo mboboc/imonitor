@@ -18,6 +18,6 @@
 #      REVISION:  ---
 #===============================================================================
 
-tar -xzf htop2.tar.gz -C imonitor/
+tar -xzf htop2.tar.gz
 cd imonitor
 ./autogen.sh && ./configure && make
