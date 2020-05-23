@@ -11,7 +11,6 @@
 extern "C" {
 #endif
 
-#include <sys/epoll.h>
 
 #define EPOLL_TIMEOUT_INFINITE		-1
 

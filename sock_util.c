@@ -32,7 +32,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "utils.h"
+#include "util.h"
 #include "debug.h"
 #include "sock_util.h"
 
