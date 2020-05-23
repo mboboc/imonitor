@@ -1,31 +1,8 @@
 /*
- * epoll-based echo server. Uses epoll(7) to multiplex connections
- *
- * Operating Systems
+ * iMonitor via webserver
+ * 
+ * Source file
  */
-
-
-#define _GNU_SOURCE
-
-#include <arpa/inet.h>
-#include <assert.h>
-#include <fcntl.h>
-#include <libaio.h>
-#include <netinet/in.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/epoll.h>
-#include <sys/eventfd.h>
-#include <sys/sendfile.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <utmpx.h>
-#include <paths.h>
-#include <sys/inotify.h>
-#include <pwd.h>
-#include <time.h>       /* time_t, time, ctime */
 
 #include "imonitor.h"
 #include "debug.h"
@@ -51,11 +28,9 @@ static int logfd;
 
 enum connection_state {
 	STATE_DATA_RECEIVED,
-	STATE_DATA_SENT,
 	STATE_CONNECTION_CLOSED,
 	STATE_READING,
 	STATE_SENDING,
-	STATE_SENT,
 	STATE_NEW_CONN
 };
 
@@ -225,7 +200,7 @@ static enum connection_state receive_message(struct connection *conn)
 	http_parser_execute(&request_parser, &settings_on_path,
 		conn->recv_buffer, strlen(conn->recv_buffer));
 
-	dlog(LOG_INFO, "Parsed simple HTTP request (bytes: %lu), path: %s\n",
+	dlog(LOG_DEBUG, "Parsed simple HTTP request (bytes: %lu), path: %s\n",
 		bytes_parsed, request_path);
 	memset(conn->request_path, 0, BUFSIZ);
 	strcpy(conn->request_path, request_path);
@@ -247,84 +222,48 @@ remove_connection:
 	return STATE_CONNECTION_CLOSED;
 }
 
+/* Write log entry to logfile */
 static void write_log(struct utmpx *ut) {
     char format_buf[BUFSIZ];
     int rc;
 
-    memset(format_buf, 0, BUFSIZ);
-		if (ut->ut_type == USER_PROCESS ||
-		    ut->ut_type == LOGIN_PROCESS ||
-		    ut->ut_type == DEAD_PROCESS ||
-            ut->ut_type == RUN_LVL) {
-			sprintf(format_buf, "%-8s ", ut->ut_user);
-			printf("%-8s ", ut->ut_user);
-			rc = write(logfd, format_buf, strlen(format_buf));
-			DIE(rc < 0, "write failed");
-			memset(format_buf, 0, BUFSIZ);
-			sprintf(format_buf, "%-9.9s ",
-				(ut->ut_type == EMPTY) ? "EMPTY" :
-				(ut->ut_type == RUN_LVL) ? "RUN_LVL" :
-				(ut->ut_type == BOOT_TIME) ? "BOOT_TIME" :
-				(ut->ut_type == NEW_TIME) ? "NEW_TIME" :
-				(ut->ut_type == OLD_TIME) ? "OLD_TIME" :
-				(ut->ut_type == INIT_PROCESS) ? "INIT_PR" :
-				(ut->ut_type == LOGIN_PROCESS) ? "LOGIN_PR" :
-				(ut->ut_type == USER_PROCESS) ? "USER_PR" :
-				(ut->ut_type == DEAD_PROCESS) ? "DEAD_PR" : "???");
-			printf("%-9.9s ",
-				(ut->ut_type == EMPTY) ? "EMPTY" :
-				(ut->ut_type == RUN_LVL) ? "RUN_LVL" :
-				(ut->ut_type == BOOT_TIME) ? "BOOT_TIME" :
-				(ut->ut_type == NEW_TIME) ? "NEW_TIME" :
-				(ut->ut_type == OLD_TIME) ? "OLD_TIME" :
-				(ut->ut_type == INIT_PROCESS) ? "INIT_PR" :
-				(ut->ut_type == LOGIN_PROCESS) ? "LOGIN_PR" :
-				(ut->ut_type == USER_PROCESS) ? "USER_PR" :
-				(ut->ut_type == DEAD_PROCESS) ? "DEAD_PR" : "???");
-			rc = write(logfd, format_buf, strlen(format_buf));
-			DIE(rc < 0, "write failed");
-			memset(format_buf, 0, BUFSIZ);
-			sprintf(format_buf, "%5ld %-6.6s %-3.5s %-20s ", (long) ut->ut_pid,
-				ut->ut_line, ut->ut_id, ut->ut_host);
-			printf("%5ld %-6.6s %-3.5s %-20s ", (long) ut->ut_pid,
-				ut->ut_line, ut->ut_id, ut->ut_host);
-			rc = write(logfd, format_buf, strlen(format_buf));
-			DIE(rc < 0, "write failed");
-			memset(format_buf, 0, BUFSIZ);
-            time_t t = (time_t) ut->ut_tv.tv_sec;
-			sprintf(format_buf, "%s\n", ctime(&t));
-            printf("%s\n", ctime(&t));
-			rc = write(logfd, format_buf, strlen(format_buf));
-			DIE(rc < 0, "write failed");
-			memset(&ut, 0, sizeof(ut));
+	if (ut->ut_type == USER_PROCESS ||
+	ut->ut_type == LOGIN_PROCESS ||
+	ut->ut_type == DEAD_PROCESS ||
+	ut->ut_type == RUN_LVL) {
+		memset(format_buf, 0, BUFSIZ);
+		sprintf(format_buf, "%-8s ", ut->ut_user);
+		rc = write(logfd, format_buf, strlen(format_buf));
+		DIE(rc < 0, "write failed");
+
+		memset(format_buf, 0, BUFSIZ);
+		sprintf(format_buf, "%-9.9s ",
+			(ut->ut_type == EMPTY) ? "EMPTY" :
+			(ut->ut_type == RUN_LVL) ? "RUN_LVL" :
+			(ut->ut_type == BOOT_TIME) ? "BOOT_TIME" :
+			(ut->ut_type == NEW_TIME) ? "NEW_TIME" :
+			(ut->ut_type == OLD_TIME) ? "OLD_TIME" :
+			(ut->ut_type == INIT_PROCESS) ? "INIT_PR" :
+			(ut->ut_type == LOGIN_PROCESS) ? "LOGIN_PR" :
+			(ut->ut_type == USER_PROCESS) ? "USER_PR" :
+			(ut->ut_type == DEAD_PROCESS) ? "DEAD_PR" : "???");
+		rc = write(logfd, format_buf, strlen(format_buf));
+		DIE(rc < 0, "write failed");
+
+		memset(format_buf, 0, BUFSIZ);
+		sprintf(format_buf, "%5ld %-6.6s %-3.5s %-20s ", (long) ut->ut_pid,
+			ut->ut_line, ut->ut_id, ut->ut_host);
+		rc = write(logfd, format_buf, strlen(format_buf));
+		DIE(rc < 0, "write failed");
+
+		memset(format_buf, 0, BUFSIZ);
+		time_t t = (time_t) ut->ut_tv.tv_sec;
+		sprintf(format_buf, "%s\n", ctime(&t));
+		rc = write(logfd, format_buf, strlen(format_buf));
+		DIE(rc < 0, "write failed");
+
+		memset(&ut, 0, sizeof(ut));
     }
-}
-
-/*
- * Read data asynchronously using Linux AIO
- */
-static void read_data(struct connection *conn)
-{
-	int rc;
-	struct iocb iocb = {0};
-	struct iocb *piocb;
-
-	/* Add evenfd to epoll */
-	conn->eventfd = eventfd(0, 0);
-	rc = w_epoll_add_ptr_eventfd(epollfd, conn->eventfd, conn);
-	DIE(rc < 0, "w_epoll_add_eventd");
-
-	piocb = &iocb;
-
-	io_prep_pread(&iocb, conn->fd, conn->send_buffer, BUFSIZ,
-		conn->send_len);
-
-	/* Set up eventfd notification */
-	io_set_eventfd(&iocb, conn->eventfd);
-
-	/* Submit aio */
-	rc = io_submit(conn->ctx, 1, &piocb);
-	DIE(rc < 0, "io_submit failed");
 }
 
 /*
@@ -341,6 +280,7 @@ static void send_data(struct connection *conn)
 	rc = w_epoll_add_ptr_eventfd(epollfd, conn->eventfd, conn);
 	DIE(rc < 0, "w_epoll_add_eventd");
 
+	/* Prepare to send data */
 	piocb = &iocb;
 	if (conn->is_header) {
 		io_prep_pwrite(&iocb, conn->sockfd, conn->send_buffer,
@@ -420,7 +360,7 @@ static void handle_work(struct connection *conn)
 	switch (conn->state) {
 	case STATE_DATA_RECEIVED:
 		if (is_file(conn->request_path)) {
-			dlog(LOG_INFO, "Sending HTTP header\n");
+			dlog(LOG_DEBUG, "Sending HTTP header\n");
 			fd = open(conn->request_path + 1, O_RDWR, 0644);
 			DIE(fd < 0, "open failed");
 
@@ -442,19 +382,12 @@ static void handle_work(struct connection *conn)
 		conn->state = STATE_SENDING;
 		break;
 	case STATE_READING:
-		if (is_file_static(conn->request_path)) {
-			dlog(LOG_DEBUG, "Reading STATIC file\n");
+			dlog(LOG_DEBUG, "Reading file\n");
 			send_static(conn);
 			conn->state = STATE_SENDING;
-		} else {
-			dlog(LOG_DEBUG, "Reading DYNAMIC file\n");
-			read_data(conn);
-			rc = w_epoll_update_ptr_in(epollfd, conn->sockfd, conn);
-			DIE(rc < 0, "w_epoll_add_ptr_in");
-		}
 		break;
 	case STATE_SENDING:
-		dlog(LOG_INFO, "Request to SEND data.\n");
+		dlog(LOG_DEBUG, "Request to SEND data.\n");
 		send_data(conn);
 		rc = w_epoll_update_ptr_in(epollfd, conn->sockfd, conn);
 		DIE(rc < 0, "w_epoll_add_ptr_in");
@@ -487,6 +420,7 @@ static void handle_work_done(struct connection *conn)
 	DIE(rc < 0, "io_getevents failed");
 
 	switch (conn->state) {
+	/* Finished reading from file async */
 	case STATE_READING:
 		dlog(LOG_DEBUG, "Done reading\n");
 		conn->send_len += events->res;
@@ -496,12 +430,13 @@ static void handle_work_done(struct connection *conn)
 		DIE(rc < 0, "w_epoll_add_ptr_out");
 		conn->state = STATE_SENDING;
 		break;
+	/* Finished sending file async */
 	case STATE_SENDING:
 		dlog(LOG_DEBUG, "Done sending.\n");
 
 		/* Done sending file, closing connection*/
 		if (conn->send_len == conn->file_dimension) {
-			dlog(LOG_DEBUG, "Done reading whole file!\n");
+			dlog(LOG_INFO, "Logfile sent succesfully.\n");
 			goto remove_connection;
 		}
 		rc = w_epoll_update_ptr_out(epollfd, conn->sockfd, conn);
@@ -536,7 +471,7 @@ static void handle_epollin(struct connection *conn)
 		handle_client_request(conn);
 		break;
 	default:
-		dlog(LOG_DEBUG, "Check done work\n");
+		dlog(LOG_DEBUG, "Check work done\n");
 		handle_work_done(conn);
 		break;
 	}
@@ -572,9 +507,10 @@ int main(void)
 
 
 	/* If logfile doesn't exists, create it */
-    if (!file_exists(AUTH_LOG_PATH)) {
+    if (!file_exists(AUTH_LOG_PATH))
        create_logfile();
-    }
+    else
+		logfd = open(AUTH_LOG_PATH, O_RDWR, 0644);
 
 	dlog(LOG_DEBUG, "\n-----------------SERVER STARTED -----------------\n");
 
@@ -595,7 +531,7 @@ int main(void)
     DIE(rc < 0, "w_epoll_add_fd_in failed");
 
 	/* Create server socket */
-	listenfd = tcp_create_listener(AWS_LISTEN_PORT, DEFAULT_LISTEN_BACKLOG);
+	listenfd = tcp_create_listener(IMONITOR_LISTEN_PORT, DEFAULT_LISTEN_BACKLOG);
 	DIE(listenfd < 0, "tcp_create_listener");
 
 	/* Add socket to epoll */
@@ -603,7 +539,7 @@ int main(void)
 	DIE(rc < 0, "w_epoll_add_fd_in");
 
 	dlog(LOG_INFO, "Server waiting for connections on port %d\n",
-	     AWS_LISTEN_PORT);
+	     IMONITOR_LISTEN_PORT);
 
 	/* Server main loop */
 	while (1) {
@@ -618,11 +554,11 @@ int main(void)
 		 *   - new connection requests (on server socket)
 		 *   - socket communication (on connection sockets)
 		 */
-		if (rev.data.fd == listenfd) {
+		if (rev.data.fd == listenfd) { /* new connection */
 			dlog(LOG_DEBUG, "New connection\n");
 			if (rev.events & EPOLLIN)
 				handle_new_connection();
-		} else if (rev.data.fd == inotifyfd) {
+		} else if (rev.data.fd == inotifyfd) { /* new log entry */
                 rc = read(rev.data.fd, &buffer, BUFSIZ);
                 DIE(rc < 0, "read failed");
 
@@ -635,10 +571,10 @@ int main(void)
                 DIE(rc < 0, "read failed");
 
                 write_log(&ut);
-		} else if (rev.events & EPOLLOUT) {
+		} else if (rev.events & EPOLLOUT) { /* need to send file */
 			dlog(LOG_DEBUG, "Ready to do work\n");
 			handle_work(rev.data.ptr);
-		} else if (rev.events & EPOLLIN) {
+		} else if (rev.events & EPOLLIN) { /* new message OR done doing async operation */
 			dlog(LOG_DEBUG, "Received epollin");
 			handle_epollin(rev.data.ptr);
 		} else {

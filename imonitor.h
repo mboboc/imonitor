@@ -1,34 +1,41 @@
 /*
- * Asynchronous Web Server - header file (macros and structures)
- *
- * Operating Systems
+ * iMonitor via webserver
+ * 
+ * Header file
  */
-
 #ifndef AWS_H_
 #define AWS_H_		1
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define _GNU_SOURCE
 
-#define AWS_LISTEN_PORT		8888
-#define AWS_DOCUMENT_ROOT	"./"
-#define AWS_REL_STATIC_FOLDER	"static/"
-#define AWS_REL_DYNAMIC_FOLDER	"dynamic/"
-#define AWS_ABS_STATIC_FOLDER	(AWS_DOCUMENT_ROOT AWS_REL_STATIC_FOLDER)
-#define AWS_ABS_DYNAMIC_FOLDER	(AWS_DOCUMENT_ROOT AWS_REL_DYNAMIC_FOLDER)
-#define TRUE 1
-#define FALSE 0
+#include <arpa/inet.h>
+#include <assert.h>
+#include <fcntl.h>
+#include <libaio.h>
+#include <netinet/in.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/epoll.h>
+#include <sys/eventfd.h>
+#include <sys/sendfile.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <utmpx.h>
+#include <paths.h>
+#include <sys/inotify.h>
+#include <pwd.h>
+#include <time.h>       /* time_t, time, ctime */
+
 #define PATH_UTMP _PATH_UTMP
 #define PATH_WTMP _PATH_WTMP
+#define TRUE 1
+#define FALSE 0
 
 #define IMONITOR_LISTEN_PORT 8888
 
 /* Logfile path */
 #define AUTH_LOG_PATH "./auth.log"
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* AWS_H_ */
