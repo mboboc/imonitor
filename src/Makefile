@@ -1,13 +1,15 @@
+CFLAGS = -g
+
 build: imonitor
 
-imonitor: imonitor.o hashtable.o
+imonitor: imonitor.o hashtable.o sock_util.o
 
 imonitor.o: imonitor.c
 
-hashtable.o: hashtable.c
+sock_util.o: sock_util.c
 
 clean:
-	rm *.o imonitor
+	rm *.o imonitor, auth.log
 run:
 	./imonitor
 
@@ -15,4 +17,4 @@ memcheck:
 	valgrind ./imonitor
 
 .PHONY:
-	memcheck, build, clean, run
+	memcheck, build, clean, run 
