@@ -82,12 +82,6 @@ static http_parser_settings settings_on_path = {
 	/* on_message_complete */ 0
 };
 
-static int file_exists(char *buffer) {
-	if (access(buffer + 1, F_OK) != -1)
-		return 1;
-	return 0;
-}
-
 /*
  * Initialize connection structure on given socket
  */
@@ -166,7 +160,7 @@ static enum connection_state receive_message(struct connection *conn)
 	char abuffer[64];
 	size_t bytes_parsed;
 
-	rc = get_peer_address(conn->sockfd, abuffer, 64);
+	rc = get_peer_address(conn->sockfd, abuffer);
 	if (rc < 0) {
 		ERR("get_peer_address");
 		goto remove_connection;
@@ -222,20 +216,54 @@ remove_connection:
 	return STATE_CONNECTION_CLOSED;
 }
 
+/*
+ * Read data asynchronously using Linux AIO
+ */
+static void read_data(struct connection *conn)
+{
+	int rc;
+	struct iocb iocb = {0};
+	struct iocb *piocb;
+
+	/* Add evenfd to epoll */
+	conn->eventfd = eventfd(0, 0);
+	rc = w_epoll_add_ptr_eventfd(epollfd, conn->eventfd, conn);
+	DIE(rc < 0, "w_epoll_add_eventd");
+
+	piocb = &iocb;
+
+	io_prep_pread(&iocb, conn->fd, conn->send_buffer, BUFSIZ,
+		conn->send_len);
+
+	/* Set up eventfd notification */
+	io_set_eventfd(&iocb, conn->eventfd);
+
+	/* Submit aio */
+	rc = io_submit(conn->ctx, 1, &piocb);
+	DIE(rc < 0, "io_submit failed");
+}
+
 /* Write log entry to logfile */
 static void write_log(struct utmpx *ut) {
     char format_buf[BUFSIZ];
     int rc;
 
+
 	if (ut->ut_type == USER_PROCESS ||
 	ut->ut_type == LOGIN_PROCESS ||
 	ut->ut_type == DEAD_PROCESS ||
 	ut->ut_type == RUN_LVL) {
+		/* Log
+		 * Username
+		 */
 		memset(format_buf, 0, BUFSIZ);
 		sprintf(format_buf, "%-8s ", ut->ut_user);
 		rc = write(logfd, format_buf, strlen(format_buf));
 		DIE(rc < 0, "write failed");
 
+		/* Log
+		 * Type of record
+		 */
 		memset(format_buf, 0, BUFSIZ);
 		sprintf(format_buf, "%-9.9s ",
 			(ut->ut_type == EMPTY) ? "EMPTY" :
@@ -250,12 +278,19 @@ static void write_log(struct utmpx *ut) {
 		rc = write(logfd, format_buf, strlen(format_buf));
 		DIE(rc < 0, "write failed");
 
+		/* Log 
+		 * PID of login process
+		 * Device name of tty - "/dev/"
+		 * Terminal name suffix or inittab ID
+		 * Hostname for remote login
+		 */
 		memset(format_buf, 0, BUFSIZ);
 		sprintf(format_buf, "%5ld %-6.6s %-3.5s %-20s ", (long) ut->ut_pid,
 			ut->ut_line, ut->ut_id, ut->ut_host);
 		rc = write(logfd, format_buf, strlen(format_buf));
 		DIE(rc < 0, "write failed");
 
+		/* Log timestamp */
 		memset(format_buf, 0, BUFSIZ);
 		time_t t = (time_t) ut->ut_tv.tv_sec;
 		sprintf(format_buf, "%s\n", ctime(&t));
@@ -316,39 +351,6 @@ static void handle_client_request(struct connection *conn)
 	DIE(rc < 0, "w_epoll_add_ptr_inout");
 }
 
-/*
- * Send data by zero-copy
- */
-static enum connection_state send_static(struct connection *conn)
-{
-	char abuffer[64];
-	int rc, offset;
-
-	rc = get_peer_address(conn->sockfd, abuffer, 64);
-	if (rc < 0) {
-		ERR("get_peer_address");
-		goto remove_connection;
-	}
-
-	/* Send data from file */
-	dlog(LOG_INFO, "Sending message to %s\n", abuffer);
-	offset = sendfile(conn->sockfd, conn->fd, 0, BUFSIZ);
-	DIE(offset < 0, "failed sendfile");
-
-	conn->send_len += offset;
-	conn->state = STATE_SENDING;
-
-	return STATE_SENDING;
-
-remove_connection:
-	dlog(LOG_DEBUG, "Closing communication.\n");
-	rc = w_epoll_remove_ptr(epollfd, conn->sockfd, conn);
-	DIE(rc < 0, "w_epoll_remove_ptr");
-
-	connection_remove(conn);
-
-	return STATE_CONNECTION_CLOSED;
-}
 
 /*
  * Handle EPOLLOUT requests on client connection
@@ -358,7 +360,7 @@ static void handle_work(struct connection *conn)
 	int rc, size, fd;
 
 	switch (conn->state) {
-	case STATE_DATA_RECEIVED:
+	case STATE_DATA_RECEIVED: /* Start sending header */
 		if (is_file(conn->request_path)) {
 			dlog(LOG_DEBUG, "Sending HTTP header\n");
 			fd = open(conn->request_path + 1, O_RDWR, 0644);
@@ -381,10 +383,11 @@ static void handle_work(struct connection *conn)
 		conn->is_header = TRUE;
 		conn->state = STATE_SENDING;
 		break;
-	case STATE_READING:
-			dlog(LOG_DEBUG, "Reading file\n");
-			send_static(conn);
-			conn->state = STATE_SENDING;
+	case STATE_READING: /* Send file */
+			dlog(LOG_DEBUG, "Reading DYNAMIC file\n");
+			read_data(conn);
+			rc = w_epoll_update_ptr_in(epollfd, conn->sockfd, conn);
+			DIE(rc < 0, "w_epoll_add_ptr_in");
 		break;
 	case STATE_SENDING:
 		dlog(LOG_DEBUG, "Request to SEND data.\n");
@@ -499,12 +502,18 @@ static void create_logfile() {
 	endutxent();
 }
 
+/* Check if file exists */
+static int file_exists(char *buffer) {
+	if (access(buffer + 1, F_OK) != -1)
+		return 1;
+	return 0;
+}
+
 int main(void)
 {
 	int rc, fd;
 	struct utmpx ut;
     char buffer[BUFSIZ];
-
 
 	/* If logfile doesn't exists, create it */
     if (!file_exists(AUTH_LOG_PATH))
