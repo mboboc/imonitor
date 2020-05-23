@@ -214,14 +214,14 @@ int main(int argc, char *argv[]) {
 
         if (rev.events & EPOLLIN) {
             if (rev.data.fd == inotifyfd) {
-                printf("Am primit EPOLLIN!");
+                printf("Am primit EPOLLIN!\n");
                 rc = read(rev.data.fd, &buffer, BUFSIZ);
                 DIE(rc < 0, "read failed");
 
                 int fd, rc;
                 struct utmpx ut;
 
-                fd = open(PATH_WTMP, O_WRONLY, 0644);
+                fd = open(PATH_WTMP, O_RDONLY, 0644);
                 DIE(fd < 0, "open failed");
 
                 lseek(fd, -sizeof(ut), SEEK_END);
