@@ -35,6 +35,9 @@ static int inotifyfd;
 /* WTMP file descriptor */
 static int wtmpfd;
 
+/* Logfile file descriptor */
+static int logfd;
+
 enum connection_state {
     STATE_DATA_RECEIVED,
     STATE_DATA_SENT,
@@ -83,32 +86,16 @@ int file_exists(char *buffer)
 	return 0;
 }
 
-/* 
-* Get data from the OS 
-* Format it
-* Store it in logfile
-*/
-static void create_logfile() {
-	int logfd, fd, rc;
-	char format_buf[BUFSIZ];
-	struct utmpx *ut;
+/* Format and write log to file */
+static void write_log(struct utmpx *ut) {
+    char format_buf[BUFSIZ];
+    int rc;
 
-	logfd = open(AUTH_LOG_PATH, O_RDWR | O_CREAT, 0644);
-    DIE(logfd < 0, "open failed");
-
-	utmpxname(PATH_WTMP);
-	setutxent();
-	
-	sprintf(format_buf, "user 	type 	PID     line 	id 		host 	date/time\n");
-	rc = write(logfd, format_buf, strlen(format_buf));
-	DIE(rc < 0, "write failed");
-	memset(&ut, 0, sizeof(ut));
-	while((ut = getutxent()) != NULL) {
-		memset(format_buf, 0, BUFSIZ);
+    memset(format_buf, 0, BUFSIZ);
 		if (ut->ut_type == USER_PROCESS ||
-		ut->ut_type == LOGIN_PROCESS ||
-		ut->ut_type == DEAD_PROCESS ||
-        ut->ut_type == RUN_LVL) {
+		    ut->ut_type == LOGIN_PROCESS ||
+		    ut->ut_type == DEAD_PROCESS ||
+            ut->ut_type == RUN_LVL) {
 			sprintf(format_buf, "%-8s ", ut->ut_user);
 			printf("%-8s ", ut->ut_user);
 			rc = write(logfd, format_buf, strlen(format_buf));
@@ -150,8 +137,32 @@ static void create_logfile() {
 			rc = write(logfd, format_buf, strlen(format_buf));
 			DIE(rc < 0, "write failed");
 			memset(&ut, 0, sizeof(ut));
-		}
+    }
+}
+
+/* 
+* Get data from the OS 
+* Format it
+* Store it in logfile
+*/
+static void create_logfile() {
+	int fd, rc;
+	struct utmpx *ut;
+
+	logfd = open(AUTH_LOG_PATH, O_RDWR | O_CREAT, 0644);
+    DIE(logfd < 0, "open failed");
+
+	utmpxname(PATH_WTMP);
+	setutxent();
+	
+	// sprintf(format_buf, "user 	type 	PID     line 	id 		host 	date/time\n");
+	// rc = write(logfd, format_buf, strlen(format_buf));
+	// DIE(rc < 0, "write failed");
+	memset(&ut, 0, sizeof(ut));
+	while((ut = getutxent()) != NULL) {
+		write_log(ut);
 	}
+
 	endutxent();
 }
 
@@ -203,18 +214,22 @@ int main(int argc, char *argv[]) {
 
         if (rev.events & EPOLLIN) {
             if (rev.data.fd == inotifyfd) {
+                printf("Am primit EPOLLIN!");
                 rc = read(rev.data.fd, &buffer, BUFSIZ);
                 DIE(rc < 0, "read failed");
 
                 int fd, rc;
                 struct utmpx ut;
 
+                fd = open(PATH_WTMP, O_WRONLY, 0644);
+                DIE(fd < 0, "open failed");
+
                 lseek(fd, -sizeof(ut), SEEK_END);
+                memset(&ut, 0, sizeof(ut));
                 rc = read(fd, &ut, sizeof(ut));
                 DIE(rc < 0, "read failed");
 
-                printf("User = %s\n", ut.ut_user);
-                printf("Host = %s\n", ut.ut_host);
+                write_log(&ut);
             }
         }
     }

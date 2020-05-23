@@ -9,7 +9,7 @@ imonitor.o: imonitor.c
 sock_util.o: sock_util.c
 
 clean:
-	rm *.o imonitor, auth.log
+	rm *.o imonitor auth.log
 run:
 	./imonitor
 
