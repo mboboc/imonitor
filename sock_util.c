@@ -114,7 +114,7 @@ int tcp_create_listener(unsigned short port, int backlog)
  * address format IP_address:port (e.g. 192.168.0.1:22).
  */
 
-int get_peer_address(int sockfd, char *buf, size_t len)
+int get_peer_address(int sockfd, char *buf)
 {
 	struct sockaddr_in addr;
 	socklen_t addrlen = sizeof(struct sockaddr_in);
