@@ -4,7 +4,7 @@
 
 ### Organizare
 
-Aceasta este o solutie de monitorizare a conexiunilor remote realizate de useri. Implementarea se foloseste de fisierele interne ale sistemului de operare (WTMP) pentru a culege date. Aceste date sunt ulterior formatate si stocate int-un fisier tip logfile. Program-ul implementeaza o logica interna tip server web astfel ca datele logurilor pot fi accesate usor de catre clienti.
+Aceasta este o solutie de monitorizare a conexiunilor remote realizate de useri. Implementarea se foloseste de fisierele interne ale sistemului de operare (WTMP) pentru a culege date. Aceste date sunt ulterior formatate si stocate int-un fisier tip logfile. Programul implementeaza o logica interna tip server web astfel ca datele logurilor pot fi accesate usor de catre clienti.
 
 Solutia pe care am gandit-o initial suna in felul urmator:
 - un program care sa logeze date despre conexiunile userilor intr-un fisier / sau mai multe fisiere (in functie de data, user, etc)
