@@ -1,6 +1,6 @@
 /*
  * iMonitor via webserver
- * 
+ *
  * Source file
  */
 
@@ -168,11 +168,11 @@ static enum connection_state receive_message(struct connection *conn)
 
 	do {
 		bytes_recv =
-		recv(conn->sockfd, conn->recv_buffer + offset,
-			BUFSIZ - offset, 0);
+		    recv(conn->sockfd, conn->recv_buffer + offset,
+		         BUFSIZ - offset, 0);
 		if (bytes_recv < 0) { /* Error in communication */
 			dlog(LOG_ERR, "Error in communication from: %s\n",
-				abuffer);
+			     abuffer);
 			goto remove_connection;
 		}
 		if (bytes_recv == 0) { /* Connection closed */
@@ -191,11 +191,11 @@ static enum connection_state receive_message(struct connection *conn)
 	http_parser_init(&request_parser, HTTP_REQUEST);
 	memset(request_path, 0, BUFSIZ);
 	bytes_parsed =
-	http_parser_execute(&request_parser, &settings_on_path,
-		conn->recv_buffer, strlen(conn->recv_buffer));
+	    http_parser_execute(&request_parser, &settings_on_path,
+	                        conn->recv_buffer, strlen(conn->recv_buffer));
 
 	dlog(LOG_DEBUG, "Parsed simple HTTP request (bytes: %lu), path: %s\n",
-		bytes_parsed, request_path);
+	     bytes_parsed, request_path);
 	memset(conn->request_path, 0, BUFSIZ);
 	strcpy(conn->request_path, request_path);
 	conn->recv_len = bytes_recv;
@@ -233,7 +233,7 @@ static void read_data(struct connection *conn)
 	piocb = &iocb;
 
 	io_prep_pread(&iocb, conn->fd, conn->send_buffer, BUFSIZ,
-		conn->send_len);
+	              conn->send_len);
 
 	/* Set up eventfd notification */
 	io_set_eventfd(&iocb, conn->eventfd);
@@ -245,14 +245,14 @@ static void read_data(struct connection *conn)
 
 /* Write log entry to logfile */
 static void write_log(struct utmpx *ut) {
-    char format_buf[BUFSIZ];
-    int rc;
+	char format_buf[BUFSIZ];
+	int rc;
 
 
 	if (ut->ut_type == USER_PROCESS ||
-	ut->ut_type == LOGIN_PROCESS ||
-	ut->ut_type == DEAD_PROCESS ||
-	ut->ut_type == RUN_LVL) {
+	        ut->ut_type == LOGIN_PROCESS ||
+	        ut->ut_type == DEAD_PROCESS ||
+	        ut->ut_type == RUN_LVL) {
 		/* Log
 		 * Username
 		 */
@@ -266,19 +266,19 @@ static void write_log(struct utmpx *ut) {
 		 */
 		memset(format_buf, 0, BUFSIZ);
 		sprintf(format_buf, "%-9.9s ",
-			(ut->ut_type == EMPTY) ? "EMPTY" :
-			(ut->ut_type == RUN_LVL) ? "RUN_LVL" :
-			(ut->ut_type == BOOT_TIME) ? "BOOT_TIME" :
-			(ut->ut_type == NEW_TIME) ? "NEW_TIME" :
-			(ut->ut_type == OLD_TIME) ? "OLD_TIME" :
-			(ut->ut_type == INIT_PROCESS) ? "INIT_PR" :
-			(ut->ut_type == LOGIN_PROCESS) ? "LOGIN_PR" :
-			(ut->ut_type == USER_PROCESS) ? "USER_PR" :
-			(ut->ut_type == DEAD_PROCESS) ? "DEAD_PR" : "???");
+		        (ut->ut_type == EMPTY) ? "EMPTY" :
+		        (ut->ut_type == RUN_LVL) ? "RUN_LVL" :
+		        (ut->ut_type == BOOT_TIME) ? "BOOT_TIME" :
+		        (ut->ut_type == NEW_TIME) ? "NEW_TIME" :
+		        (ut->ut_type == OLD_TIME) ? "OLD_TIME" :
+		        (ut->ut_type == INIT_PROCESS) ? "INIT_PR" :
+		        (ut->ut_type == LOGIN_PROCESS) ? "LOGIN_PR" :
+		        (ut->ut_type == USER_PROCESS) ? "USER_PR" :
+		        (ut->ut_type == DEAD_PROCESS) ? "DEAD_PR" : "???");
 		rc = write(logfd, format_buf, strlen(format_buf));
 		DIE(rc < 0, "write failed");
 
-		/* Log 
+		/* Log
 		 * PID of login process
 		 * Device name of tty - "/dev/"
 		 * Terminal name suffix or inittab ID
@@ -286,7 +286,7 @@ static void write_log(struct utmpx *ut) {
 		 */
 		memset(format_buf, 0, BUFSIZ);
 		sprintf(format_buf, "%5ld %-6.6s %-3.5s %-20s ", (long) ut->ut_pid,
-			ut->ut_line, ut->ut_id, ut->ut_host);
+		        ut->ut_line, ut->ut_id, ut->ut_host);
 		rc = write(logfd, format_buf, strlen(format_buf));
 		DIE(rc < 0, "write failed");
 
@@ -298,7 +298,7 @@ static void write_log(struct utmpx *ut) {
 		DIE(rc < 0, "write failed");
 
 		memset(&ut, 0, sizeof(ut));
-    }
+	}
 }
 
 /*
@@ -319,11 +319,11 @@ static void send_data(struct connection *conn)
 	piocb = &iocb;
 	if (conn->is_header) {
 		io_prep_pwrite(&iocb, conn->sockfd, conn->send_buffer,
-			conn->header_size, 0);
+		               conn->header_size, 0);
 		conn->is_header = FALSE;
 	} else {
 		io_prep_pwrite(&iocb, conn->sockfd, conn->send_buffer,
-			conn->read_data, 0);
+		               conn->read_data, 0);
 	}
 
 	/* Set up eventfd notification */
@@ -384,10 +384,10 @@ static void handle_work(struct connection *conn)
 		conn->state = STATE_SENDING;
 		break;
 	case STATE_READING: /* Send file */
-			dlog(LOG_DEBUG, "Reading DYNAMIC file\n");
-			read_data(conn);
-			rc = w_epoll_update_ptr_in(epollfd, conn->sockfd, conn);
-			DIE(rc < 0, "w_epoll_add_ptr_in");
+		dlog(LOG_DEBUG, "Reading DYNAMIC file\n");
+		read_data(conn);
+		rc = w_epoll_update_ptr_in(epollfd, conn->sockfd, conn);
+		DIE(rc < 0, "w_epoll_add_ptr_in");
 		break;
 	case STATE_SENDING:
 		dlog(LOG_DEBUG, "Request to SEND data.\n");
@@ -480,8 +480,8 @@ static void handle_epollin(struct connection *conn)
 	}
 }
 
-/* 
-* Get data from the OS 
+/*
+* Get data from the OS
 * Format it
 * Store it in logfile
 */
@@ -489,13 +489,13 @@ static void create_logfile() {
 	struct utmpx *ut;
 
 	logfd = open(AUTH_LOG_PATH, O_RDWR | O_CREAT, 0644);
-    DIE(logfd < 0, "open failed");
+	DIE(logfd < 0, "open failed");
 
 	utmpxname(PATH_WTMP);
 	setutxent();
-	
+
 	memset(&ut, 0, sizeof(ut));
-	while((ut = getutxent()) != NULL) {
+	while ((ut = getutxent()) != NULL) {
 		write_log(ut);
 	}
 
@@ -513,12 +513,12 @@ int main(void)
 {
 	int rc, fd;
 	struct utmpx ut;
-    char buffer[BUFSIZ];
+	char buffer[BUFSIZ];
 
 	/* If logfile doesn't exists, create it */
-    if (!file_exists(AUTH_LOG_PATH))
-       create_logfile();
-    else
+	if (!file_exists(AUTH_LOG_PATH))
+		create_logfile();
+	else
 		logfd = open(AUTH_LOG_PATH, O_RDWR, 0644);
 
 	dlog(LOG_DEBUG, "\n-----------------SERVER STARTED -----------------\n");
@@ -528,16 +528,16 @@ int main(void)
 	DIE(epollfd < 0, "w_epoll_create");
 
 	/* Creating the inotify instance*/
-    inotifyfd = inotify_init();
-    DIE(inotifyfd < 0, "inotify_init failed");
+	inotifyfd = inotify_init();
+	DIE(inotifyfd < 0, "inotify_init failed");
 
 	/* Start monitoring WTMP */
-    wtmpfd = inotify_add_watch(inotifyfd, PATH_WTMP, IN_MODIFY);
-    DIE(wtmpfd < 0, "inotify_add_watch failed");
+	wtmpfd = inotify_add_watch(inotifyfd, PATH_WTMP, IN_MODIFY);
+	DIE(wtmpfd < 0, "inotify_add_watch failed");
 
 	/* Add inotify fd to epoll */
-    rc = w_epoll_add_fd_in(epollfd, inotifyfd);
-    DIE(rc < 0, "w_epoll_add_fd_in failed");
+	rc = w_epoll_add_fd_in(epollfd, inotifyfd);
+	DIE(rc < 0, "w_epoll_add_fd_in failed");
 
 	/* Create server socket */
 	listenfd = tcp_create_listener(IMONITOR_LISTEN_PORT, DEFAULT_LISTEN_BACKLOG);
@@ -568,18 +568,18 @@ int main(void)
 			if (rev.events & EPOLLIN)
 				handle_new_connection();
 		} else if (rev.data.fd == inotifyfd) { /* new log entry */
-                rc = read(rev.data.fd, &buffer, BUFSIZ);
-                DIE(rc < 0, "read failed");
+			rc = read(rev.data.fd, &buffer, BUFSIZ);
+			DIE(rc < 0, "read failed");
 
-                fd = open(PATH_WTMP, O_RDONLY, 0644);
-                DIE(fd < 0, "open failed");
+			fd = open(PATH_WTMP, O_RDONLY, 0644);
+			DIE(fd < 0, "open failed");
 
-                lseek(fd, -sizeof(ut), SEEK_END);
-                memset(&ut, 0, sizeof(ut));
-                rc = read(fd, &ut, sizeof(ut));
-                DIE(rc < 0, "read failed");
+			lseek(fd, -sizeof(ut), SEEK_END);
+			memset(&ut, 0, sizeof(ut));
+			rc = read(fd, &ut, sizeof(ut));
+			DIE(rc < 0, "read failed");
 
-                write_log(&ut);
+			write_log(&ut);
 		} else if (rev.events & EPOLLOUT) { /* need to send file */
 			dlog(LOG_DEBUG, "Ready to do work\n");
 			handle_work(rev.data.ptr);
